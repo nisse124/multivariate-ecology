@@ -1,0 +1,118 @@
+---
+title: "Similarity Examples - Vltava Data"
+author: "K. Nissen"
+date: "2025-09-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+This document replicates the similarity examples using the Vltava dataset, based on David Zelený's tutorial. We'll compute distances, explore different similarity indices, and interpret the ecological meaning.
+
+## Load Packages and Data
+
+```{r load-packages}
+library(vegan)
+library(dplyr)
+
+# Load species composition data
+vltava_spe <- read.delim(
+  "https://raw.githubusercontent.com/zdealveindy/anadat-r/master/data/vltava-spe.txt",
+  row.names = 1
+)
+#Load environmental data
+vltava_env <- read.delim(
+  "https://raw.githubusercontent.com/zdealveindy/anadat-r/master/data/vltava-env.txt"
+)
+
+# Preview data
+head(vltava_spe)
+table(vltava_env$GROUP)
+```
+Question1: What is the Euclidean distance between plot 12 and 56? Since the data in the compositional matrix represent species percentage cover (which usually has highly right-skewed distribution), reduce the importance of dominant species by log-transforming the data first before calculating the distance
+```{r Question 1} 
+# Log-transform species composition data
+vltava_spe_log <- log1p(vltava_spe)
+
+# Calculate Euclidean distance on log-transformed data
+vltava_eucl <- dist(vltava_spe_log)
+
+# Extract distance between plot 12 and 56
+eucl_distance <- as.matrix(vltava_eucl)[56, 12]
+eucl_distance
+
+#Interpretation: The Euclidean distance between plot 12 and 56 is approximatley 9.89
+```
+Question 2: Which two plots are the most similar, measured by Bray-Curtis distance on the log-transformed data?
+``` {R Q 2}
+# Calculate Bray-Curtis distances
+vltava_bray <- vegdist(vltava_spe_log, method = "bray")
+
+# Find pair with smallest distance
+most_similar <- which(as.matrix(vltava_bray) == min(vltava_bray), arr.ind = TRUE)
+most_similar
+
+# Compare shared species in most similar plots
+vltava_spe[c(2, 4), colSums(vltava_spe[c(2, 4), ]) > 0]
+
+#What have we learned?: Plots 2 and 4 are the most similar in species composition, as indicated by the smallest Bray-Curtis distance.
+
+# Find pair with largest distance
+most_different <- which(as.matrix(vltava_bray) == max(vltava_bray), arr.ind = TRUE)
+most_different
+
+# Compare species in those plots
+vltava_spe[c(58, 1), colSums(vltava_spe[c(58, 1), ]) > 0]
+
+# Get just the first pair of maximally dissimilar plots
+most_different_pair <- most_different[1, ]
+most_different_pair
+
+# View the species in the two most dissimilar plots
+vltava_spe[most_different_pair, colSums(vltava_spe[most_different_pair, ]) > 0]
+
+#Interpretation: Plots 2 and 4 are the most similar, sharing many species. Plots 1 and 58 are among the most dissimilar, sharing no species, resulting in a Bray-Curtis distance of 1.
+```
+Question 3:The plots have been classified into four different vegetation types, and each plot belongs to one of them. Which of the vegetation types is the most compositionally homogeneous? (ie the plots in that type have the most similar species composition to each other?). Use Hellinger distance calculated on log-transformed species composition data for this purpose, and for assignment of the plots into vegetation types, use the variable GROUP from the vltava.env file. 
+
+What is Hellinger distance?
+ - A distance measure appropriate for species abundance or cover data.
+ - Based on Hellinger-transformed values (square root of relative abundance).
+ - Handles zeroes and skewed species data better than Euclidean.
+ - Works well in ordination and clustering because it’s a Euclidean metric after transformation.
+
+```{R Q3}
+# Load species composition data
+vltava_spe <- read.delim(
+  "https://raw.githubusercontent.com/zdealveindy/anadat-r/master/data/vltava-spe.txt",
+  row.names = 1
+)
+
+# Log-transform species data (log1p keeps zeros as zeros)
+vltava_spe_log <- log1p(vltava_spe)
+
+# Load environmental data (with GROUP variable)
+vltava_env <- read.delim(
+  "https://raw.githubusercontent.com/zdealveindy/anadat-r/master/data/vltava-env.txt"
+)
+
+# Load vegan for decostand (Hellinger transformation) and dist
+library(vegan)
+
+# Calculate average within-group Hellinger distances for each group 1 to 4
+hellinger_by_group <- lapply(1:4, function(g) {
+  group_data <- vltava_spe_log[vltava_env$GROUP == g, ]  # subset plots by group
+  dist_matrix <- dist(decostand(group_data, method = "hell"))  # Hellinger distance
+  mean(dist_matrix)  # mean distance within group
+})
+
+# Show results as a named vector for clarity
+names(hellinger_by_group) <- paste("Group", 1:4)
+hellinger_by_group
+
+
+```
