@@ -1,0 +1,109 @@
+---
+title: "Hierarchical Clustering in Ecology"
+author: "K. Nissen"
+date: "2025-09-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+The goal of this analysis is to apply hierarchical clustering to the USArrests dataset to identify groups of states with similar crime profiles, and to understand how different clustering methods affect the results
+
+In this R Markdown file, we:
+
+    -Standardized the data
+
+    -Computed distance matrices
+
+    -Applied 3 hierarchical clustering methods
+
+    -Visualized and compared clusterings
+
+    -Projected clusters into PCA space
+
+    -Evaluated clustering quality
+```{R ???}
+
+library(tidyverse)
+library(cluster)
+library(factoextra)
+library(ggpubr)
+library(clustertend)  # For clustering tendency
+
+
+#Load data
+# Using USArrests dataset; replace with your own ecological data
+data <- USArrests
+head(data)
+summary(data)
+
+#Standardize data
+data_scaled <- scale(data)
+
+#Check clustering tendency
+get_clust_tendency(data_scaled, n = nrow(data_scaled) - 1, graph = TRUE)
+
+#Compute distance matrix
+dist_matrix <- dist(data_scaled, method = "euclidean")
+
+#Perform hierarchical clustering (different methods)
+hc_complete <- hclust(dist_matrix, method = "complete")
+hc_average  <- hclust(dist_matrix, method = "average")
+hc_single   <- hclust(dist_matrix, method = "single")
+
+#Visualize dendograms
+# Basic base R dendrograms
+par(mfrow = c(1, 3))
+plot(hc_complete, main = "Complete Linkage", xlab = "", sub = "", cex = 0.6)
+plot(hc_average, main = "Average Linkage", xlab = "", sub = "", cex = 0.6)
+plot(hc_single, main = "Single Linkage", xlab = "", sub = "", cex = 0.6)
+par(mfrow = c(1, 1))
+
+#Fancier dendograms
+fviz_dend(hc_complete, k = 4, rect = TRUE, main = "Complete Linkage")
+fviz_dend(hc_average,  k = 4, rect = TRUE, main = "Average Linkage")
+fviz_dend(hc_single,   k = 4, rect = TRUE, main = "Single Linkage")
+
+#Compare cluster assignments
+# Cut dendrograms into 4 clusters
+clust_complete <- cutree(hc_complete, k = 4)
+clust_average  <- cutree(hc_average, k = 4)
+clust_single   <- cutree(hc_single, k = 4)
+
+# Combine into data frame
+cluster_df <- data.frame(
+  State = rownames(data),
+  Complete = clust_complete,
+  Average = clust_average,
+  Single = clust_single
+)
+
+head(cluster_df)
+
+# Visualize clusters in PCA
+fviz_cluster(list(data = data_scaled, cluster = clust_complete),
+             geom = "point", ellipse.type = "convex", palette = "jco",
+             main = "Clusters (Complete Linkage) in PCA Space")
+fviz_cluster(list(data = data_scaled, cluster = clust_average),
+             main = "Clusters (Average Linkage)", palette = "jco")
+
+fviz_cluster(list(data = data_scaled, cluster = clust_single),
+             main = "Clusters (Single Linkage)", palette = "jco")
+
+#Cophenetic correlation coefficients
+cor_complete <- cor(dist_matrix, cophenetic(hc_complete))
+cor_average  <- cor(dist_matrix, cophenetic(hc_average))
+cor_single   <- cor(dist_matrix, cophenetic(hc_single))
+
+cor_complete
+cor_average
+cor_single
+
+#Add clusters to original data
+data_with_clusters <- data %>%
+  mutate(Cluster = factor(clust_complete))
+
+head(data_with_clusters)
+```
+We calculated cophenetic correlation coefficients to evaluate how well each linkage method preserved the original data's pairwise distances. Average linkage had the highest score (0.718), closely followed by complete linkage (0.698).Single linkage performed worse (0.541), likely due to its tendency to form elongated clusters (chaining), which distort cluster relationships.
