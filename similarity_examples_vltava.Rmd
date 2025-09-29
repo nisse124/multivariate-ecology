@@ -114,5 +114,6 @@ hellinger_by_group <- lapply(1:4, function(g) {
 names(hellinger_by_group) <- paste("Group", 1:4)
 hellinger_by_group
 
+#Interpretation
 
 ```
