@@ -1,0 +1,139 @@
+---
+title: "Fourth Corner Analysis"
+author: "K. Nissen"
+date: "2025-12-08"
+output: html_document
+---
+Introduction:
+
+Understanding species distributions requires considering three types of ecological data:
+
+R matrix — Environmental variables (sites × environment)
+L matrix — Species abundance or presence/absence (sites × species)
+Q matrix — Species functional traits (species × traits)
+
+The fourth-corner problem asks:
+      How do species traits (Q) relate to environmental gradients (R),
+      as mediated by species abundances (L)?
+The method tests:
+Are environmental gradients associated with particular species traits?
+
+Each test corresponds to one trait–environment pair.     
+      
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+library(vegan)
+library(ade4)
+
+data(dune)
+data(dune.env)
+
+dune.trait <- data.frame(
+  LifeForm = c("shr","shr","gr","gr","gr","forb","forb","forb","forb","forb",
+               "forb","gr","gr","forb","shr","forb","forb","forb","gr","gr",
+               "shr","forb","forb","gr","forb","gr","gr","gr","forb","forb"),
+  LeafType = c("broad","broad","grass","grass","grass","broad","broad","broad","broad","broad",
+               "broad","grass","grass","broad","broad","broad","broad","broad","grass","grass",
+               "broad","broad","broad","grass","broad","grass","grass","grass","broad","broad"),
+  SeedMass = c("med","med","small","small","small","small","small","small","small","small",
+               "small","small","small","small","med","small","small","small","small","small",
+               "med","small","small","small","small","small","small","small","small","small"),
+  row.names = colnames(dune)
+)
+
+dune.trait[] <- lapply(dune.trait, factor)
+
+```
+
+
+```{}
+set.seed(123)
+
+fc <- ade4::fourthcorner(
+  dune.env,
+  dune,
+  dune.trait,
+  modeltype = 6
+)
+
+fc
+
+
+```
+
+Conclusion:
+
+There is little evidence that the traits in dune.traits are strongly filtered by the environmental variables in dune.env.
+This suggests the dune vegetation community is not strongly structured by the measured environmental gradients, or the dataset is too small / coarse to detect strong patterns.
+
+Conceptual understanding
+
+1. Why do we need three matrices (R, L, Q) to test trait–environment relationships?
+    
+    Because traits belong to species, environments belong to sites, and species occur at sites. The L matrix links sites to species, enabling indirect testing of trait–environment associations.
+    
+2. What ecological processes could produce correlations between traits and     environmental gradients?
+
+    Environmental filtering
+    Habitat specialization
+    Competitive interactions selecting specific traits
+    Stress gradients favoring particular life forms or seed sizes
+    
+3. Why do we use permutations in fourth-corner analysis instead of classical parametric tests?
+
+    Trait–environment relationships violate assumptions of independence.
+    Permutations generate a null model preserving ecological structure while testing for non-random associations
+
+4. Look at the raw p-values before correction. Which trait–environment pairs appear to have the strongest associations?
+
+    Moist.5 × SeedM.small (p = 0.013)
+    
+    Manag.HF × SeedM.small (p = 0.027)
+    
+    Moist.5 × LifeF.grass (p = 0.028)
+
+    Manur.2 × SeedM.small (p = 0.016)
+
+5. After Holm correction, no associations remain significant. What does this tell us about the strength of the ecological signal?
+
+    Overall ecological signal is weak, 
+    Sample size too small (20 sites), 
+    Too many tests (inflating correction severity), OR
+    Environmental and trait variables too simple
+
+6. Why is the Holm correction more conservative than FDR? How would this affect interpretation?
+
+    It strictly controls family-wise error rate (FWER).
+    Holm penalizes multiple comparisons more heavily than FDR, often eliminating marginally significant findings.
+
+7. Moisture seems to show some possible associations with traits. How might moisture regulate plant functional traits in grassland ecosystems?
+
+    Wet soils favor fast-growing species
+    Dry soils favor drought-tolerant traits (deep roots, shrubs, larger seeds)
+    Seedling survival differs across gradients
+
+8. Small-seeded species appear more common at high moisture levels (raw p-values). What ecological mechanisms might explain this?
+
+    Wet soils allow mass germination of many small seeds
+    Small seeds disperse widely and colonize disturbed wet sites
+    Moisture reduces drought stress that disproportionately harms small seeds
+
+9. How could management intensity influence plant traits (e.g., mowing, fertilizing, grazing)?
+
+    Mowing favors fast-growing graminoids
+    Fertilization favors tall, competitive species
+    Grazing favors low-growing or grazing-tolerant species
+
+10. What are the limitations of this dataset (dune)? How might they reduce power to detect trait–environment associations?
+
+    Only 20 sites
+    Trait data limited
+    Species abundances sparse → reduces statistical power.
+
+11. If you wanted to detect stronger signals, what additional data could you collect?
+
+    Continuous trait data (SLA, height, leaf N, root structure)
+    More environmental variables (pH, nutrients, disturbance history)
+    More sites and replicates
+    Historically repeated surveys (temporal dimension)
