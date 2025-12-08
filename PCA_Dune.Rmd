@@ -1,0 +1,182 @@
+---
+title: "PCA with Dune Data"
+author: "K. Nissen"
+date: "2025-12-09"
+output: html_document
+---
+
+# Introduction
+
+In ecology, we often collect data on many species at different sites. It can be hard to see patterns in all this data at once.Principal Component Analysis (PCA)helps us summarize the data by reducing it to a few main axes that explain most of the variation in species composition.
+
+For this example, we use the Dune dataset from the `vegan` R package. It has counts of different plant species at 20 sites in Dutch coastal dunes, plus some environmental information like management type and soil moisture.
+
+The goals of this analysis are:
+
+1. Reduce the species data into a few main axes with PCA.  
+2. See how sites relate to each other in species composition.  
+3. Find out which species contribute most to the main axes.  
+4. Explore whether management type is related to differences in species composition.
+
+We also use a Hellinger transformation on the species data. This just means we adjust the data so that very abundant species don’t dominate the PCA 
+
+```
+```{r prepare-data}
+```{r setup, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(vegan)  
+library(ggplot2)
+data(dune)
+data(dune.env)
+  
+glimpse(dune)
+glimpse(dune.env)
+```
+
+```{}
+dune2 <- dune %>% select_if(~ any(. > 0))
+dune_hellinger <- decostand(dune2, method = "hellinger")
+```
+
+Hellinger transformation converts each value to be suitable for Eclidean-based methods (like PCA) while preserving ecological relationships
+
+
+```{}
+pca_res <- prcomp(dune_hellinger, center = TRUE, scale. = TRUE)
+summary(pca_res)
+```
+PCA reduces the dimensionality of the dataset while preserving the variation.
+
+prcomp() centers and scales the data so that each species contributes equally.
+
+The summary() shows the proportion of variance explained by each principal component (PC).
+
+
+```{}
+#Scree Plot
+plot(pca_res, type = "l", main = "Scree Plot: Dune PCA")
+
+#Scatter Plot
+pca_df <- as_tibble(pca_res$x) %>%
+rownames_to_column("Site") %>%
+bind_cols(dune.env)
+#Plot by management type
+ggplot(pca_df, aes(x = PC1, y = PC2, color = Management)) +
+geom_point(size = 3, alpha = 0.8) +
+theme_minimal() +
+xlab(paste0("PC1 (", round(summary(pca_res)$importance[2,1]*100, 1), "%)")) +
+ylab(paste0("PC2 (", round(summary(pca_res)$importance[2,2]*100, 1), "%)")) +
+ggtitle("PCA of Dune Vegetation Data by Management Type") +
+scale_color_brewer(palette = "Set1")
+```
+Each point represents a site.
+
+Coloring by Management allows visual assessment of how management practices influence species composition.
+
+PC1 and PC2 are the axes capturing the largest ecological variation.
+
+```{}
+loadings <- as_tibble(pca_res$rotation, rownames = "Species")
+#Top 10 species
+loadings %>% arrange(desc(abs(PC1))) %>% head(10)
+loadings %>% arrange(desc(abs(PC2))) %>% head(10)
+```
+Loadings indicate how strongly each species influences a principal component.
+
+Positive/negative loadings help interpret which species drive variation along each axis.
+
+```{}
+biplot(pca_res, scale = 0, cex = 0.7, main = "PCA Biplot of Dune Data")
+```
+Arrows represent species; points represent sites.
+
+Direction of arrows shows increasing abundance of a species.
+
+Sites near an arrow have higher relative abundance of that species.
+
+# Interpretation of Results
+
+After running the PCA and looking at the plots, here are some points to consider:
+
+1. Variance Explained:  
+   The scree plot and PCA summary show how much variation each principal component (PC) captures. Usually, PC1 and PC2 capture the most variation. Sites that are close together in the PC plot have similar species composition, while sites far apart are more different.
+
+2. Sites and Environmental Factors:  
+   In the PC1 vs PC2 plot, sites are colored by Management type. If sites with the same management cluster together, it suggests that management practices influence which species are present.
+
+3. Species Contributions:  
+   The species loadings tell us which species are most important for the main axes. Species with large positive or negative loadings on a PC strongly influence that axis. Looking at these species can help explain the ecological gradients driving the patterns we see.
+
+4. Biplot Interpretation:  
+   In the biplot, points are sites and arrows represent species. Sites near an arrow have higher abundances of that species. The direction of arrows shows how species vary across the principal components.
+
+Key takeaways:  
+- PCA helps simplify complex species data into a few interpretable axes.  
+- Environmental or management factors can explain some of the variation in species composition.  
+- Looking at species loadings helps us understand which species are driving differences between sites.
+
+---
+
+# Questions for Discussion
+1. Which principal component explains the most variation in species composition? Why might that be?
+    
+    PC1 explains approximately 24% of the total variation in the dune species data, making it the dominant axis of variation. PC2 explains another 17%, and together PC1 and PC2 capture about 41% of the overall variation in the dataset.
+  
+    PC1 likely represents the main ecological gradient in the dune system (e.g., moisture availability, disturbance, soil fertilization, or successional stage). Because community composition changes along environmental gradients, the strongest gradient will naturally explain the most variance. Sites that appear close together on the PC1 vs. PC2 plot have more similar species assemblages, while sites farther apart are more ecologically distinct.
+
+2. Do sites with the same Management type cluster together? What does this suggest about the effect of management on vegetation?
+
+    Yes, sites with the same Management type generally cluster together on the PCA plot. This suggests that management practices (e.g., grazing, mowing, fertilization) have a real and measurable influence on plant community composition.
+
+When management types form clusters:
+
+    It indicates that management affects species abundances and/or presence–absence.
+
+    Management may impose similar ecological conditions (e.g., mowing increases light availability, grazing reduces dominant grasses).
+
+    Communities respond in predictable ways to disturbance or resource changes.
+
+    In short, management is an important driver of vegetation patterns in this dataset.
+    
+3. Which species contribute most to PC1 and PC2? How might their ecological roles explain the observed patterns?
+
+Top contributors to PC1 (absolute loadings):
+Species	PC1 Loading
+Ranuflam	–0.330
+Agrostol	–0.324
+Eleopalu	–0.319
+Poaprat	0.265
+Achimill	0.265
+Top contributors to PC2:
+Species	PC2 Loading
+Poatriv	–0.371
+Hyporadi	0.339
+Airaprae	0.315
+Scorautu	0.278
+Alopgeni	–0.277
+
+    Species with the highest absolute loadings are the most influential in shaping each principal component. Their ecological traits likely reflect the underlying gradients the PCA is capturing. For example:
+
+     Some high-loading species are moisture-loving (e.g., Eleocharis palustris), suggesting PC1 may represent a moisture gradient.
+
+    Others reflect disturbance or nutrient conditions (e.g., Agrostis stolonifera, which thrives in managed or disturbed sites).
+  
+    High PC2 species may distinguish between open vs. more vegetated areas, or different grazing or mowing regimes.
+
+    These loadings help interpret what ecological processes shape the ordination axes.
+    
+4. How does the Hellinger transformation help when performing PCA on species abundance data?
+
+    The Hellinger transformation converts raw abundances into square-rooted relative abundances, reduces the influence of extremely common or dominant species, gives more weight to patterns of species presence and proportional abundance, makes Euclidean distance (used in PCA) appropriate for community data.
+
+    Without this transformation, PCA would be dominated by a handful of abundant species and would not properly reflect ecological similarity among sites. After transformation, rare and common species contribute more proportionally and communities can be compared more fairly.
+    
+5. How might PCA results change if we included rare species that were removed during preprocessing?
+
+    Rare species may add noise because they occur in few sites and do not strongly explain broad ecological gradients.
+
+    PCA axes might become slightly less interpretable, as PCA emphasizes variance and rare species contribute very little variance.
+
+    Ordination distances may shift slightly, but community-level patterns often remain similar.
+
+    In some cases, rare species can highlight unique or specialized habitats, adding detail to interpretation. Removing rare species tends to produce cleaner, more stable, and more interpretable PCA results.
